@@ -164,7 +164,6 @@ def main():
         remote_connection_used = True
         # parse host
         remote_host, remote_path = arg_dict["destination"].split(":")
-        print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path} (on {remote_host}){bcolors.ENDC}")
 
         # create an sshfs
         sshfs_temp_directory = tempfile.mktemp()
@@ -172,11 +171,12 @@ def main():
         create_sshfs_mount(sshfs_temp_directory, remote_path, remote_host)
 
         # let the remote path point to the sshfs directory
+        remote_path_org = remote_path
         remote_path = sshfs_temp_directory
     else:
+        remote_path_org = arg_dict["destination"]
         remote_path = arg_dict["destination"]
-        print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path} (local){bcolors.ENDC}")
-
+    print(f"{bcolors.OKBLUE}[!] Initializing...{bcolors.ENDC}")
     copy_dir(local_path, remote_path)
     
     event_handler = FileSyncher(local_path, remote_path, arg_dict["verbose"])
@@ -184,6 +184,12 @@ def main():
     observer = Observer()
     observer.schedule(event_handler, local_path, recursive=True)
     observer.start()
+
+    # print it here after we started running cause the initial copy can take some time
+    if remote_connection_used:
+        print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path_org} (on {remote_host}){bcolors.ENDC}")
+    else:
+        print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path_org} (local){bcolors.ENDC}")
     try:
         while True:
             time.sleep(1)
