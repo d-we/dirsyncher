@@ -2,7 +2,7 @@
 Sync directories to a (remote) location.
 
 ## Dependencies
-- [watchdog](https://pypi.org/project/pynput/)
+- [python-watchdog](https://pypi.org/project/pynput/)
 
 ## Functionality  
 Syncs changes to a local directory to a remote directory. The remote directory has to exist.
