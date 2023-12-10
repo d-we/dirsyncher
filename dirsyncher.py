@@ -31,14 +31,17 @@ def copy_symlink(src, dest):
     
 # this copies the directory while leaving the additional files 
 # that are already in the dest in place
-def copy_dir(source_dir, dest_dir):
+def copy_dir(source_dir, dest_dir, exclude_pattern = None):
     if not os.path.exists(dest_dir):
         os.mkdir(dest_dir)
     for file in os.listdir(source_dir):
         source = source_dir + "/" + file
         dest = dest_dir + "/" + file
+        if exclude_pattern is not None and exclude_pattern in source:
+            print(f"Skipping {source}")
+            continue
         if os.path.isdir(source):
-            copy_dir(source, dest)
+            copy_dir(source, dest, exclude_pattern)
         else:
             try:
                 if os.path.islink(source):
@@ -50,11 +53,12 @@ def copy_dir(source_dir, dest_dir):
 
 class FileSyncher(FileSystemEventHandler):
 
-    def __init__(self, local_path, remote_path, verbose):
+    def __init__(self, local_path, remote_path, verbose = False, exclude_pattern = None):
         super().__init__()
         self.local_path = local_path
         self.remote_path = remote_path
         self.verbose = verbose
+        self.exclude_pattern = exclude_pattern
 
     def get_relative_path(self, remote_path):
         return os.path.relpath(remote_path, self.local_path)
@@ -77,6 +81,9 @@ class FileSyncher(FileSystemEventHandler):
             shutil.copy(src_path, dest_path)
         
     def on_modified(self, event):
+        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+            return
+
         if self.verbose: print(f"[+] Updating {event.src_path}")
 
         if os.path.isfile(event.src_path):
@@ -88,6 +95,9 @@ class FileSyncher(FileSystemEventHandler):
                 pass
     
     def on_created(self, event):
+        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+            return
+
         if self.verbose: print(f"[+] Creating {event.src_path}")
 
         file_relpath = self.get_relative_path(event.src_path)
@@ -98,6 +108,9 @@ class FileSyncher(FileSystemEventHandler):
             pass
     
     def on_deleted(self, event):
+        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+            return
+
         if self.verbose: print(f"[+] Deleting {event.src_path}")
         file_relpath = self.get_relative_path(event.src_path)
 
@@ -108,6 +121,9 @@ class FileSyncher(FileSystemEventHandler):
             pass
     
     def on_moved(self, event):
+        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+            return
+
         if self.verbose: print(f"[+] Moving {event.src_path} to {event.dest_path}")
 
         src_relpath = self.get_relative_path(event.src_path)
@@ -131,6 +147,12 @@ def parse_arguments() -> dict:
                         dest="destination",
                         action="store",  # just store the value
                         help="The directory to sync to")
+    parser.add_argument('--exclude', '-x',
+                        type=str,  # cast argument to this type
+                        metavar="<exclude-directory-pattern>",  # the value used for help messages
+                        dest="exclude",
+                        action="store",  # just store the value
+                        help="All files/directories containing this pattern will be excluded")
     parser.add_argument('--verbose',
                         dest="verbose",
                         action="store_true",  # just store that the value was set
@@ -145,6 +167,7 @@ def create_sshfs_mount(local_path, remote_path, remote_host):
     if p.returncode != 0:
         print(f"{bcolors.FAIL}[!] Failed to create sshfs directory. Aborting!{bcolors.ENDC}")
         print(f"{bcolors.FAIL}[!] Does the remote directory exist? If not, create it!")
+        print(f"{bcolors.FAIL}[!] Command used: sshfs {remote_host}:{remote_path} {local_path}")
         exit(1)
 
 def remove_sshfs_mount(local_path):
@@ -177,9 +200,10 @@ def main():
         remote_path_org = arg_dict["destination"]
         remote_path = arg_dict["destination"]
     print(f"{bcolors.OKBLUE}[!] Initializing...{bcolors.ENDC}")
-    copy_dir(local_path, remote_path)
+    copy_dir(local_path, remote_path, exclude_pattern=arg_dict["exclude"])
+    print(f"{bcolors.OKBLUE}[!] Copy finished...{bcolors.ENDC}")
     
-    event_handler = FileSyncher(local_path, remote_path, arg_dict["verbose"])
+    event_handler = FileSyncher(local_path, remote_path, arg_dict["verbose"], arg_dict["exclude"])
 
     observer = Observer()
     observer.schedule(event_handler, local_path, recursive=True)
