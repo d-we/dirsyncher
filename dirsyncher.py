@@ -7,6 +7,8 @@ import time
 import tempfile
 import argparse
 import subprocess
+import hashlib
+
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -29,6 +31,19 @@ def copy_symlink(src, dest):
         exit(1)
     os.symlink(link_target, dest)
     
+
+def hash_file(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as fd:
+        for chunk in iter(lambda: fd.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+    
+
+def is_same_file(file_a, file_b):
+    return hash_file(file_a) == hash_file(file_b)
+
+
 # this copies the directory while leaving the additional files 
 # that are already in the dest in place
 def copy_dir(source_dir, dest_dir, exclude_pattern = None):
@@ -38,7 +53,7 @@ def copy_dir(source_dir, dest_dir, exclude_pattern = None):
         source = source_dir + "/" + file
         dest = dest_dir + "/" + file
         if exclude_pattern is not None and exclude_pattern in source:
-            print(f"Skipping {source}")
+            print(f"{bcolors.VERBOSE}[*] Skipping {source}...{bcolors.ENDC}")
             continue
         if os.path.isdir(source):
             copy_dir(source, dest, exclude_pattern)
@@ -47,7 +62,10 @@ def copy_dir(source_dir, dest_dir, exclude_pattern = None):
                 if os.path.islink(source):
                     copy_symlink(source, dest)
                 else:
-                    shutil.copy(source, dest)
+                    if not is_same_file(source, dest):
+                        shutil.copy(source, dest)
+                    else:
+                        print(f"{bcolors.VERBOSE}[*] Same already: {source}.{bcolors.ENDC}")
             except FileNotFoundError:
                 print(f"{bcolors.WARNING}[!] Could not copy {source}!{bcolors.ENDC}")
 
