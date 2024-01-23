@@ -41,7 +41,10 @@ def hash_file(fname):
     
 
 def is_same_file(file_a, file_b):
-    return hash_file(file_a) == hash_file(file_b)
+    try:
+        return hash_file(file_a) == hash_file(file_b)
+    except FileNotFoundError:
+        return False
 
 
 # this copies the directory while leaving the additional files 
@@ -58,16 +61,17 @@ def copy_dir(source_dir, dest_dir, exclude_pattern = None):
         if os.path.isdir(source):
             copy_dir(source, dest, exclude_pattern)
         else:
-            try:
-                if os.path.islink(source):
-                    copy_symlink(source, dest)
+            #try:
+            if os.path.islink(source):
+                copy_symlink(source, dest)
+            else:
+                if not is_same_file(source, dest):
+                    shutil.copy(source, dest)
                 else:
-                    if not is_same_file(source, dest):
-                        shutil.copy(source, dest)
-                    else:
-                        print(f"{bcolors.VERBOSE}[*] Same already: {source}.{bcolors.ENDC}")
-            except FileNotFoundError:
-                print(f"{bcolors.WARNING}[!] Could not copy {source}!{bcolors.ENDC}")
+                    print(f"{bcolors.VERBOSE}[*] Same already: {source}.{bcolors.ENDC}")
+
+            #except FileNotFoundError:
+            #    print(f"{bcolors.WARNING}[!] Could not copy {source}!{bcolors.ENDC}")
 
 class FileSyncher(FileSystemEventHandler):
 
