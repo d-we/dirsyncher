@@ -185,7 +185,7 @@ def parse_arguments() -> dict:
 
     
 def create_sshfs_mount(local_path, remote_path, remote_host):
-    p = subprocess.run(["sshfs", f"{remote_host}:{remote_path} 2>/dev/null", local_path])
+    p = subprocess.run(["sshfs", f"{remote_host}:{remote_path}", local_path])
 
     if p.returncode != 0:
         # probably the directory does not exist, hence we just try to create it.
