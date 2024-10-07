@@ -9,7 +9,7 @@ Syncs changes to a local directory to a remote directory. The remote directory h
 
 ## Example Usage
 ```bash
-./dirsyncher.py ./local-dir lab-machine:remote-dir -x build
+./dirsyncher.py ./local-dir lab-machine:remote-dir -x build,venv
 ```
 This will sync the local directory `./local-dir` to the remote directory `remote-dir` on the machine with the SSH name`lab-machine`.
 Also, it will exclude all paths containing the string `"build"`. These will not be synced.

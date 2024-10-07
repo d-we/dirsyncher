@@ -57,21 +57,26 @@ def is_same_file(file_a, file_b):
     except FileNotFoundError:
         return False
 
+def is_excluded(exclude_directories, file):
+    for exclude in exclude_directories:
+        if exclude in file:
+            return True
+    return False
 
 # this copies the directory while leaving the additional files 
 # that are already in the dest in place
-def copy_dir(source_dir, dest_dir, exclude_pattern = None):
+def copy_dir(source_dir, dest_dir, exclude_directories = []):
     if not os.path.exists(dest_dir):
         os.mkdir(dest_dir)
 
     for file in os.listdir(source_dir):
         source = source_dir + "/" + file
         dest = dest_dir + "/" + file
-        if exclude_pattern is not None and exclude_pattern in source:
+        if is_excluded(exclude_directories, source):
             print(f"{bcolors.VERBOSE}[*] Skipping {source}...{bcolors.ENDC}")
             continue
         if os.path.isdir(source):
-            copy_dir(source, dest, exclude_pattern)
+            copy_dir(source, dest, exclude_directories)
         else:
             #try:
             if not is_same_file(source, dest):
@@ -87,13 +92,16 @@ def copy_dir(source_dir, dest_dir, exclude_pattern = None):
 
 class FileSyncher(FileSystemEventHandler):
 
-    def __init__(self, local_path, remote_path, verbose = False, exclude_pattern = None):
+    def __init__(self, local_path, remote_path, verbose = False, exclude_directories = []):
         super().__init__()
         self.local_path = local_path
         self.remote_path = remote_path
         self.verbose = verbose
-        self.exclude_pattern = exclude_pattern
+        self.exclude_directories = exclude_directories
 
+    def is_excluded(self, file):
+        return is_excluded(self.exclude_directories, file)
+        
     def get_relative_path(self, remote_path):
         return os.path.relpath(remote_path, self.local_path)
 
@@ -115,7 +123,7 @@ class FileSyncher(FileSystemEventHandler):
             shutil.copy(src_path, dest_path)
         
     def on_modified(self, event):
-        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+        if self.is_excluded(event.src_path):
             return
 
         if self.verbose: print(f"[+] Updating {event.src_path}")
@@ -129,7 +137,7 @@ class FileSyncher(FileSystemEventHandler):
                 pass
     
     def on_created(self, event):
-        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+        if self.is_excluded(event.src_path):
             return
 
         if self.verbose: print(f"[+] Creating {event.src_path}")
@@ -142,7 +150,7 @@ class FileSyncher(FileSystemEventHandler):
             pass
     
     def on_deleted(self, event):
-        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+        if self.is_excluded(event.src_path):
             return
 
         if self.verbose: print(f"[+] Deleting {event.src_path}")
@@ -155,7 +163,7 @@ class FileSyncher(FileSystemEventHandler):
             pass
     
     def on_moved(self, event):
-        if self.exclude_pattern is not None and self.exclude_pattern in event.src_path:
+        if self.is_excluded(event.src_path):
             return
 
         if self.verbose: print(f"[+] Moving {event.src_path} to {event.dest_path}")
@@ -186,7 +194,7 @@ def parse_arguments() -> dict:
                         metavar="<exclude-directory-pattern>",  # the value used for help messages
                         dest="exclude",
                         action="store",  # just store the value
-                        help="All files/directories containing this pattern will be excluded")
+                        help="All files/directories containing this pattern will be excluded (comma-separate multiple entries)")
     parser.add_argument('--verbose',
                         dest="verbose",
                         action="store_true",  # just store that the value was set
@@ -239,11 +247,21 @@ def main():
     else:
         remote_path_org = arg_dict["destination"]
         remote_path = arg_dict["destination"]
+
+    if arg_dict["exclude"] is None:
+        exclude_directories = []
+    elif "," in arg_dict["exclude"]:
+        # if we have multiple exclude patterns we split them
+        exclude_directories = [e.strip() for e in arg_dict["exclude"].split(",")]
+    else:
+        exclude_directories = list([arg_dict["exclude"]])
+    print("exclude_directories", exclude_directories)
+
     print(f"{bcolors.OKBLUE}[!] Initializing...{bcolors.ENDC}")
-    copy_dir(local_path, remote_path, exclude_pattern=arg_dict["exclude"])
+    copy_dir(local_path, remote_path, exclude_directories)
     print(f"{bcolors.OKBLUE}[!] Copy finished...{bcolors.ENDC}")
     
-    event_handler = FileSyncher(local_path, remote_path, arg_dict["verbose"], arg_dict["exclude"])
+    event_handler = FileSyncher(local_path, remote_path, arg_dict["verbose"], exclude_directories)
 
     observer = Observer()
     observer.schedule(event_handler, local_path, recursive=True)
