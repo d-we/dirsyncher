@@ -272,7 +272,7 @@ def main():
         print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path_org} (on {remote_host}){bcolors.ENDC}")
     else:
         print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path_org} (local){bcolors.ENDC}")
-    print(f"{bcolors.OKBLUE}[*] Using tmp-directory: {sshfs_temp_directory}{bcolors.ENDC}")
+    print(f"{bcolors.OKBLUE}[*] Using local directory: {sshfs_temp_directory}{bcolors.ENDC}")
     try:
         while True:
             time.sleep(1)
