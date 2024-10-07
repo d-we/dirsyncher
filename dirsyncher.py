@@ -255,7 +255,6 @@ def main():
         exclude_directories = [e.strip() for e in arg_dict["exclude"].split(",")]
     else:
         exclude_directories = list([arg_dict["exclude"]])
-    print("exclude_directories", exclude_directories)
 
     print(f"{bcolors.OKBLUE}[!] Initializing...{bcolors.ENDC}")
     copy_dir(local_path, remote_path, exclude_directories)
