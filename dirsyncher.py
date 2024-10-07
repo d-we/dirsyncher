@@ -42,6 +42,17 @@ def hash_file(fname):
 
 def is_same_file(file_a, file_b):
     try:
+        # of both are symlinks we need to compare the target
+        if os.path.islink(file_a) and os.path.islink(file_b):
+            return os.readlink(file_a) == os.readlink(file_b)
+
+        # if only one is a symlink we return false
+        if os.path.islink(file_a) and not os.path.islink(file_b):
+            return False
+        if os.path.islink(file_b) and not os.path.islink(file_a):
+            return False
+
+        # if boths are actual files we compare the hash
         return hash_file(file_a) == hash_file(file_b)
     except FileNotFoundError:
         return False
@@ -52,6 +63,7 @@ def is_same_file(file_a, file_b):
 def copy_dir(source_dir, dest_dir, exclude_pattern = None):
     if not os.path.exists(dest_dir):
         os.mkdir(dest_dir)
+
     for file in os.listdir(source_dir):
         source = source_dir + "/" + file
         dest = dest_dir + "/" + file
@@ -62,13 +74,13 @@ def copy_dir(source_dir, dest_dir, exclude_pattern = None):
             copy_dir(source, dest, exclude_pattern)
         else:
             #try:
-            if os.path.islink(source):
-                copy_symlink(source, dest)
-            else:
-                if not is_same_file(source, dest):
-                    shutil.copy(source, dest)
+            if not is_same_file(source, dest):
+                if os.path.islink(source):
+                    copy_symlink(source, dest)
                 else:
-                    print(f"{bcolors.VERBOSE}[*] Same already: {source}.{bcolors.ENDC}")
+                        shutil.copy(source, dest)
+            else:
+                print(f"{bcolors.VERBOSE}[*] Same already: {source}.{bcolors.ENDC}")
 
             #except FileNotFoundError:
             #    print(f"{bcolors.WARNING}[!] Could not copy {source}!{bcolors.ENDC}")
