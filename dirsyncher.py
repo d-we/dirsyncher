@@ -253,6 +253,9 @@ def main():
     elif "," in arg_dict["exclude"]:
         # if we have multiple exclude patterns we split them
         exclude_directories = [e.strip() for e in arg_dict["exclude"].split(",")]
+
+        # remove empty strings
+        exclude_directories = [i for i in exclude_directories if i] 
     else:
         exclude_directories = list([arg_dict["exclude"]])
 
