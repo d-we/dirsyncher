@@ -3,7 +3,8 @@ Sync directories to a (remote) location.
 
 
 ## Why?
-The major benefit of DirSyncher is that it behaves *like a remote mounted folder* without the issues related to executing programs from within a remotely mounted folder, e.g., some tools get incredibly slow when spawned directly in sshfs folders.
+The major benefit of DirSyncher is that it behaves *like an sshfs folder without being one*.
+Thus, without the issues related to executing programs from within a remotely mounted folder, e.g., some tools get incredibly slow when spawned directly in sshfs folders.
 To achieve this, DirSyncher monitors the source directory for changes and copies these changes to an sshfs folder, instead of directly using an sshfs folder.
 
 ## Dependencies
