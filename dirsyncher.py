@@ -12,6 +12,7 @@ import hashlib
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -65,7 +66,7 @@ def is_excluded(exclude_directories, file):
 
 # this copies the directory while leaving the additional files 
 # that are already in the dest in place
-def copy_dir(source_dir, dest_dir, exclude_directories = []):
+def copy_dir(source_dir, dest_dir, exclude_directories = [], verbose = False):
     if not os.path.exists(dest_dir):
         os.mkdir(dest_dir)
 
@@ -85,7 +86,8 @@ def copy_dir(source_dir, dest_dir, exclude_directories = []):
                 else:
                         shutil.copy(source, dest)
             else:
-                print(f"{bcolors.VERBOSE}[*] Same already: {source}.{bcolors.ENDC}")
+                if verbose:
+                    print(f"{bcolors.VERBOSE}[*] Same already: {source}.{bcolors.ENDC}")
 
             #except FileNotFoundError:
             #    print(f"{bcolors.WARNING}[!] Could not copy {source}!{bcolors.ENDC}")
@@ -219,14 +221,14 @@ def create_sshfs_mount(local_path, remote_path, remote_host):
         exit(1)
 
 def remove_sshfs_mount(local_path):
-    p = subprocess.run(["fusermount3", "-u", local_path])
-    if p.returncode != 0:
-        print(f"{bcolors.FAIL}[!] Failed to cleanup sshfs directory!{bcolors.ENDC}")
-
-
+    try:
+        p = subprocess.run(["fusermount3", "-u", local_path])
+        if p.returncode != 0:
+            print(f"{bcolors.WARNING}[!] Failed to cleanup sshfs directory!{bcolors.ENDC}")
+    except FileNotFoundError:
+        print(f"{bcolors.WARNING}[!] fusermount3 not found! Unmounting could go wrong!{bcolors.ENDC}")
     
 def main():
-    
     arg_dict = parse_arguments()
 
     local_path = arg_dict["source"]
@@ -260,7 +262,16 @@ def main():
         exclude_directories = list([arg_dict["exclude"]])
 
     print(f"{bcolors.OKBLUE}[!] Initializing...{bcolors.ENDC}")
-    copy_dir(local_path, remote_path, exclude_directories)
+
+    if arg_dict["verbose"]:
+        ts_before_initial_sync = time.time()
+
+    copy_dir(local_path, remote_path, exclude_directories, arg_dict["verbose"])
+
+    if arg_dict["verbose"]:
+        ts_after_initial_sync = time.time()
+        print(f"{bcolors.VERBOSE}[DBG] Initial sync took {ts_after_initial_sync - ts_before_initial_sync:.2f} seconds.{bcolors.ENDC}")
+
     print(f"{bcolors.OKBLUE}[!] Copy finished...{bcolors.ENDC}")
     
     event_handler = FileSyncher(local_path, remote_path, arg_dict["verbose"], exclude_directories)
@@ -274,7 +285,8 @@ def main():
         print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path_org} (on {remote_host}){bcolors.ENDC}")
     else:
         print(f"{bcolors.OKGREEN}[+] Syncing from {local_path} to {remote_path_org} (local){bcolors.ENDC}")
-    print(f"{bcolors.OKBLUE}[*] Using local directory: {sshfs_temp_directory}{bcolors.ENDC}")
+    if arg_dict["verbose"]:
+        print(f"{bcolors.OKBLUE}[*] Using local directory: {sshfs_temp_directory}{bcolors.ENDC}")
     try:
         while True:
             time.sleep(1)
@@ -283,7 +295,13 @@ def main():
     finally:
         if remote_connection_used:
             remove_sshfs_mount(sshfs_temp_directory)
-            shutil.rmtree(sshfs_temp_directory)
+            try:
+                shutil.rmtree(sshfs_temp_directory)
+            except OSError:
+                # Some OSes (e.g. macOS) seem to instantiate an unmount upon 
+                # the first rmtree call (also resulting in an OSError) while 
+                # allowing a second call to actually remove the directory.
+                shutil.rmtree(sshfs_temp_directory)
         observer.stop()
         observer.join()
 
