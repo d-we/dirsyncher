@@ -205,15 +205,20 @@ def parse_arguments() -> dict:
 
     return vars(parser.parse_args())
 
-    
+def remote_dir_exists(remote_path, remote_host):
+    p = subprocess.run(["ssh", remote_host, f"test -d {remote_path}"])
+    return p.returncode == 0
+
+def create_remote_dir(remote_path, remote_host):
+    subprocess.run(["ssh", remote_host, f"mkdir {remote_path}"])
+
 def create_sshfs_mount(local_path, remote_path, remote_host):
+    if not remote_dir_exists(remote_path, remote_host):
+        print("[+] Creating directory {remote_path} on {remote_host}...")
+        create_remote_dir(remote_path, remote_host)
+
     p = subprocess.run(["sshfs", f"{remote_host}:{remote_path}", local_path])
 
-    if p.returncode != 0:
-        # probably the directory does not exist, hence we just try to create it.
-        subprocess.run(["ssh", remote_host, f"mkdir {remote_path}"])
-        p = subprocess.run(["sshfs", f"{remote_host}:{remote_path}", local_path])
-        
     if p.returncode != 0:
         print(f"{bcolors.FAIL}[!] Failed to create sshfs directory. Aborting!{bcolors.ENDC}")
         print(f"{bcolors.FAIL}[!] Does the remote directory exist? If not, create it!")
@@ -234,9 +239,15 @@ def main():
     local_path = arg_dict["source"]
 
     if ":" in arg_dict["destination"]:
+
         remote_connection_used = True
         # parse host
         remote_host, remote_path = arg_dict["destination"].split(":")
+
+        if "~" in remote_path:
+            print(f"{bcolors.FAIL}[!] dirsyncher does not support remote paths containing '~'. "
+                  f"Please extend the path. Aborting!{bcolors.ENDC}")
+            exit(1)
 
         # create an sshfs
         sshfs_temp_directory = tempfile.mktemp()
