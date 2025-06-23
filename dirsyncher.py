@@ -109,9 +109,12 @@ class FileSyncher(FileSystemEventHandler):
 
     def delete_file_or_folder(self, path):
         try:
-            os.remove(path)
-        except IsADirectoryError:
-            shutil.rmtree(path)
+            try:
+                os.remove(path)
+            except (IsADirectoryError, PermissionError):
+                shutil.rmtree(path)
+        except PermissionError:
+            print(f"{bcolors.WARNING}[!] Permission denied when trying to delete {path}!{bcolors.ENDC}")
 
     def copy_file_or_folder(self, src_path, dest_path):
         if os.path.islink(src_path):
