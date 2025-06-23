@@ -217,7 +217,6 @@ def create_remote_dir(remote_path, remote_host):
 
 def create_sshfs_mount(local_path, remote_path, remote_host):
     if not remote_dir_exists(remote_path, remote_host):
-        print("[+] Creating directory {remote_path} on {remote_host}...")
         create_remote_dir(remote_path, remote_host)
 
     p = subprocess.run(["sshfs", f"{remote_host}:{remote_path}", local_path])
