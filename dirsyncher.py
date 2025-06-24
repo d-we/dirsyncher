@@ -8,6 +8,8 @@ import tempfile
 import argparse
 import subprocess
 import hashlib
+import random
+import string
 
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -208,6 +210,10 @@ def parse_arguments() -> dict:
 
     return vars(parser.parse_args())
 
+def remote_file_exists(remote_path, remote_host):
+    p = subprocess.run(["ssh", remote_host, f"test -f {remote_path}"])
+    return p.returncode == 0
+
 def remote_dir_exists(remote_path, remote_host):
     p = subprocess.run(["ssh", remote_host, f"test -d {remote_path}"])
     return p.returncode == 0
@@ -235,6 +241,27 @@ def remove_sshfs_mount(local_path):
     except FileNotFoundError:
         print(f"{bcolors.WARNING}[!] fusermount3 not found! Unmounting could go wrong!{bcolors.ENDC}")
     
+def create_empty_file(file_path):
+    open(file_path, 'a').close()
+
+def sshfs_functionality_check(sshfs_mount_path, remote_host, remote_path):
+    # this function checks if the sync is working correctly, e.g.,
+    # sometimes FUSE-T (macOS) stops working silently
+
+    # create a file and check whether it exists in the remote directory
+    testfile_name = "." \
+        + "".join([random.choice(string.ascii_letters) for _ in range(32)]) \
+        + "-dirsyncher-testfile"
+    testfile_path_local = sshfs_mount_path + "/" + testfile_name
+    testfile_path_remote = remote_path + "/" + testfile_name
+    assert not os.path.exists(testfile_path_local)
+
+    create_empty_file(testfile_path_local)
+    success = remote_file_exists(testfile_path_remote, remote_host)
+
+    os.remove(testfile_path_local)
+    return success
+
 def main():
     arg_dict = parse_arguments()
 
@@ -255,6 +282,11 @@ def main():
         sshfs_temp_directory = tempfile.mktemp()
         os.mkdir(sshfs_temp_directory)
         create_sshfs_mount(sshfs_temp_directory, remote_path, remote_host)
+
+        if not sshfs_functionality_check(sshfs_temp_directory, remote_host, remote_path):
+            print(f"{bcolors.FAIL}[!] sshfs functionality check failed!\n"
+                  f"[!] Maybe FUSE-T is acting up?{bcolors.ENDC}")
+            exit(1)
 
         # let the remote path point to the sshfs directory
         remote_path_org = remote_path
